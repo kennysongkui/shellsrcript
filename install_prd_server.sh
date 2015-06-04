@@ -33,6 +33,8 @@ yum -y update
 yum -y groupinstall "Development tools" "Perl Support" "Base"
 yum -y install pam-devel pcre-devel tcp_wrappers tcp_wrappers-devel zlib-devel cmake
 
+# disabled selinux
+sed -i '7s/enforcing/disabled/g' /etc/selinux/config
 
 if [ ! -d "$soft_dir/src" ]; then
 mkdir -p $soft_dir/src
