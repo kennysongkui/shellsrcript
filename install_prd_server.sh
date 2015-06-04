@@ -24,15 +24,15 @@ echo "HISTTIMEFORMAT=\"%Y%m%d-%H%M%S: \"" >> /etc/bashrc
 echo "export HISTTIMEFORMAT" >> /etc/bashrc
 
 export http_proxy=$proxy_server
+export https_proxy=$proxy_server
 mv /etc/yum.repos.d/CentOS-Base.repo /etc/yum.repos.d/CentOS-Base.repo.backup
 wget -O /etc/yum.repos.d/CentOS-Base.repo http://mirrors.aliyun.com/repo/$ser_version.repo
 yum clean all
 yum makecache
 yum -y update
-yum -y groupinstall "Development tools" "Perl Support"
-yum -y install pam-devel
-yum -y install tcp_wrappers tcp_wrappers-devel
-yum -y install pcre-devel
+yum -y groupinstall "Development tools" "Perl Support" "Base"
+yum -y install pam-devel pcre-devel tcp_wrappers tcp_wrappers-devel zlib-devel cmake
+
 
 if [ ! -d "$soft_dir/src" ]; then
 mkdir -p $soft_dir/src
@@ -51,11 +51,12 @@ make
 make test
 make install
 echo "$soft_dir/$zlib/lib" >> /etc/ld.so.conf
-rm /etc/ld.so.cache
+rm -fr /etc/ld.so.cache
 /sbin/ldconfig
 cd $soft_dir
 rm -fr zlib
 ln -s $zlib zlib
+unalias cp
 cp -fr $soft_dir/$zlib/lib/pkgconfig/* /usr/lib64/pkgconfig/
 fi
 
@@ -113,3 +114,60 @@ sed -i 's/$openssh/openssh/g' $soft_dir/$openssh/etc/sshd_config
 chkconfig --level 0123456 sshd off
 echo "/usr/local/openssh/sbin/sshd &" >> /etc/rc.d/rc.local
 fi
+
+##Install JDK 
+cd $soft_dir
+wget http://10.128.161.98/ubuntu/software/jdk-6u45-linux-x64.bin
+chmod 755 jdk-6u45-linux-x64.bin
+./jdk-6u45-linux-x64.bin
+ln -s jdk1.6.0_45 jdk
+echo "export JAVA_HOME=/usr/local/jdk" >> /etc/profile
+echo "export JRE_HOME=\$JAVA_HOME/jre" >> /etc/profile
+echo "export CLASSPATH=.:\$JAVA_HOME/lib/dt.jar:\$JAVA_HOME/lib/tools.jar" >>
+/etc/profile
+echo "export PATH=\$JAVA_HOME/bin:\$PATH" >> /etc/profile
+source /etc/profile
+
+##Install Tomcat 
+cd /usr/local
+wget http://10.128.161.98/ubuntu/software/apache-tomcat-7.0.26.tar.gz
+tar zxvf apache-tomcat-7.0.26.tar.gz
+ln -s apache-tomcat-7.0.26 tomcat
+cd tomcat
+mv webapps webapps.bak
+mkdir webapps
+echo "source /etc/profile" >> /etc/rc.d/rc.local
+echo "/usr/local/tomcat/bin/startup.sh" >> /etc/rc.d/rc.local
+
+##Install Mysql
+cd /usr/local/src
+wget http://10.128.161.98/ubuntu/software/mysql-5.6.14.tar.gz
+tar zxvf mysql-5.6.14.tar.gz
+cd mysql-5.6.14
+./BUILD/autorun.sh
+./configure --prefix=/usr/local/mysql-5.6.14 --enable-assembler --without-isam
+--enable-thread-safe-client --with-client-ldflags=-all-static
+--with-mysqld-ldflags=-all-static --with-plugins=partition,innobase
+--with-charset=all --with-collation=utf8_general_ci --with-extra-charsets=all
+--with-big-tables --without-debug
+make clean
+make
+make test
+make install
+echo "/usr/local/mysql-5.6.14/lib/mysql" >> /etc/ld.so.conf
+echo "/usr/local/mysql-5.6.14/lib/mysql/plugin" >> /etc/ld.so.conf
+rm -fr /etc/ld.so.cache 
+/sbin/ldconfig 
+cp support-files/mysql.server /etc/init.d/mysqld
+chmod 755 /etc/init.d/mysqld
+/usr/sbin/groupadd -g 27 mysql
+/usr/sbin/useradd -u 27 -g 27 -c "Mysql Dameon User" -s /sbin/nologin -d /dev/null mysql
+cd /usr/local
+ln -s mysql-5.6.14 mysql
+cd mysql
+./scripts/mysql_install_db --user=mysql
+/usr/local/mysql/bin/mysqladmin -u root password "*****************"
+echo "PATH=/usr/local/mysql/bin:\$PATH" >> /etc/profile
+echo "export PATH" >> /etc/profile
+
+echo "======================END======================"
